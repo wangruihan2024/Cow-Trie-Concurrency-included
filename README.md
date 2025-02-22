@@ -1,5 +1,7 @@
 ### Copy-on-Write Trie with Concurrency
 
+> Acknowledgement: CMU15445 Database Spring 2023 Project 0 'Cpp Primer'
+
 In this project, you will implement a key-value store backed by a copy-on-write trie. Tries are efficient ordered-tree data structures for retrieving a value for a given key. To simplify the explanation, we will assume that the keys are variable-length strings, but in practice they can be any arbitrary type.
 
 Each node in a trie can have multiple child nodes representing different possible next characters.
@@ -32,18 +34,19 @@ One more example: if we then insert ("a", "abc") and remove ("ab", 1), we can ge
 Your trie should support 3 operations:
 
 1. Get(key): Get the value corresponding to the key.
-2. Put(key, value): Set the corresponding value to the key. Overwrite existing value if the key already exists. Note that the type of the value might be non-copyable (i.e., std::unique_ptr$<int>$). This method returns a new trie.
+2. Put(key, value): Set the corresponding value to the key. Overwrite existing value if the key already exists. Note that the type of the value might be non-copyable (i.e., `std::unique_ptr<int>`). This method returns a new trie.
 3. Delete(key): Delete the value for the key. This method returns a new trie.
 None of these operations should be performed directly on the trie itself. You should create new trie nodes and reuse existing ones as much as possible.
+4. `operator==`: Actually it is not necessary. If you don't need this, just comment out.
 
-To create a new node, you should use the Clone function on the TrieNode class. To reuse an existing node in the new trie, you can copy std::shared_ptr$<TrieNode>$: copying a shared pointer doesn’t copy the underlying data. You should not manually allocate memory by using new and delete in this project. std::shared_ptr will deallocate the object when no one has a reference to the underlying object.
+To create a new node, you should use the Clone function on the TrieNode class. To reuse an existing node in the new trie, you can copy `std::shared_ptr<TrieNode>`: copying a shared pointer doesn’t copy the underlying data. You should not manually allocate memory by using new and delete in this project. `std::shared_ptr` will deallocate the object when no one has a reference to the underlying object.
 
 For the full specifications of these operations, please refer to the comments in the starter code.
     
 
 #### Task2 : Concurrent Key-Value Store
 
-After you have a copy-on-write trie which can be used in a single-thread environment, implement a concurrent key-value store for a multithreaded environment. In this task, you will need to modify trie_store.h and trie_store.cpp. This key-value store also supports 3 operations:
+After you have a copy-on-write trie which can be used in a single-thread environment, implement a concurrent key-value store for a multithreaded environment. In this task, you will need to modify trie/src.hpp. This key-value store also supports 3 operations:
 
 1. Get(key) returns the value.
 2. Put(key, value). No return value.
@@ -55,7 +58,10 @@ Your concurrent key-value store should concurrently serve multiple readers and a
 
 Also, if we get a reference to a value from the trie, we should be able to access it no matter how we modify the trie. The Get function from Trie only returns a pointer. If the trie node storing this value has been removed, the pointer will be dangling. Therefore, in TrieStore, we return a ValueGuard which stores both a reference to the value and the TrieNode corresponding to the root of the trie structure, so that the value can be accessed as we store the ValueGuard.
 
-To achieve this, we have provided you with the pseudo code for TrieStore::Get in src.hpp. Please read it carefully and think of how to implement TrieStore::Put and TrieStore::Remove.
+To achieve this, we have provided you with the pseudo code for `TrieStore::Get` in src.hpp. Please read it carefully and think of how to implement `TrieStore::Put` and `TrieStore::Remove`.
 
 
-Acknowledgement: CMU15445 Database Spring 2023 Project 0 'Cpp Primer'
+#### Advice on Concurrency :
+
+1. `std::vector` does not provide built-in thread-safety mechanisms.
+2. The granularity of the lock should be carefully considered to prevent the program from effectively becoming single-threaded.
