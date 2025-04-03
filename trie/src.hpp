@@ -109,21 +109,92 @@ class Trie {
     bool operator==(const Trie& other) const;
     // by TA: if you don't need this, just comment out.
 
+    std::shared_ptr<const TrieNode> if_exist(std::string_view key) const{
+        std::shared_ptr<const TrieNode> ans = root_;
+        for (int i = 0; i < key.size(); i++)
+        {
+            char c = key[i];
+            if(!ans || !ans->children_.count(c))
+                return nullptr;
+            else
+                ans = ans->children_.at(c); // []是非const
+        }
+        if(ans->is_value_node_)
+            return ans;
+        return nullptr;
+    }
     // Get the value associated with the given key.
     // 1. If the key is not in the trie, return nullptr.
     // 2. If the key is in the trie but the type is mismatched, return nullptr.
     // 3. Otherwise, return the value.
     template <class T>
-    auto Get(std::string_view key) const -> const T*;
+    auto Get(std::string_view key) const -> const T* {
+        auto find = if_exist(key);
+        if(!find)
+            return nullptr;
+        auto find_ = std::dynamic_pointer_cast<const TrieNodeWithValue<T>>(find);
+        if(!find_ || !find_->value_)
+            return nullptr;
+        return find_->value_.get();
+    };
 
     // Put a new key-value pair into the trie. If the key already exists,
     // overwrite the value. Returns the new trie.
     template <class T>
-    auto Put(std::string_view key, T value) const -> Trie;
+    auto Put(std::string_view key, T value) const -> Trie {
+        std::unique_ptr<TrieNode> new_root = root_ ? root_->Clone() : std::make_unique<TrieNode>(TrieNode());
+        TrieNode *it1 = new_root.get(), *last = nullptr;
+        std::shared_ptr<const TrieNode> it2 = root_;
+        for(char c:key) {
+            last = it1;
+            if(it2 && it2->children_.count(c)) {
+                
+                it1->children_[c] = it2->children_.at(c)->Clone();
+                it2 = it2->children_.at(c);
+            }else {
+                it1->children_[c] = std::make_shared<const TrieNode>(TrieNode()); //at只有访问功能，这里要改写需要用[]
+            }
+            it1 = const_cast<TrieNode*>(it1->children_[c].get());
+        }
+        last->children_[key.back()] = std::make_shared<TrieNodeWithValue<T>>(TrieNodeWithValue<T>(it1->children_, std::make_shared<T>(std::move(value))));
+        return Trie(std::shared_ptr<const TrieNode>(std::move(new_root)));
+    };
 
     // Remove the key from the trie. If the key does not exist, return the
     // original trie. Otherwise, returns the new trie.
-    auto Remove(std::string_view key) const -> Trie;
+    auto Remove(std::string_view key) const -> Trie {
+        std::shared_ptr<const TrieNode> find = if_exist(key);
+        if(!find)
+            return *this;
+        std::unique_ptr<TrieNode> new_root = root_->Clone();
+        TrieNode *it1 = new_root.get();
+        std::shared_ptr<const TrieNode> it2 = root_;
+        std::vector<TrieNode*> del;
+        for(char c: key) {
+            del.push_back(it1);
+            it1->children_[c] = it2->children_.at(c)->Clone();
+            it1 = const_cast<TrieNode*>(it1->children_[c].get());
+            it2 = it2->children_.at(c);
+        }
+        TrieNode *last = del.back();
+        last->children_[key.back()] = std::make_shared<TrieNode>(it1->children_);
+        int idx = int(key.size()) - 1;
+        while (!del.empty()) {
+            last = del.back();
+            char ch = key[idx];
+            auto child_ptr = last->children_[ch];
+            if (child_ptr->children_.empty() && !child_ptr->is_value_node_) {
+                last->children_.erase(ch); 
+                del.pop_back();       
+                idx--;
+            } else {
+                break; 
+            }
+        }
+        if(!del.size() && !new_root->is_value_node_)
+            new_root = nullptr;
+        return Trie(std::shared_ptr<TrieNode>(std::move(new_root)));
+    };
 };
 
 // This class is used to guard the value returned by the trie. It holds a
